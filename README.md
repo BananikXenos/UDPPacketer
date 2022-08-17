@@ -186,7 +186,8 @@ And after running the code we get this:
 
 Contributions are always welcome!
 
-My discord: Synse#3191
+- My discord: Synse#3191
+- [Paypal](https://www.paypal.com/paypalme/scgxenos) Donate would be cool :)
 
 
 ## License

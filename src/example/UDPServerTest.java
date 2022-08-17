@@ -26,7 +26,6 @@ public class UDPServerTest {
                 }
             }
         });
-
         this.server.start(4425);
     }
 }

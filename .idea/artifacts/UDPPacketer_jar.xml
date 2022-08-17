@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="UDPPacketer:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/UDPPacketer_jar</output-path>
+    <root id="archive" name="UDPPacketer.jar">
+      <element id="module-output" name="UDPPacketer" />
+    </root>
+  </artifact>
+</component>

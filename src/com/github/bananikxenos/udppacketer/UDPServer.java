@@ -3,6 +3,7 @@ package com.github.bananikxenos.udppacketer;
 import com.github.bananikxenos.udppacketer.listener.UDPNetworkingListener;
 import com.github.bananikxenos.udppacketer.packets.Packet;
 import com.github.bananikxenos.udppacketer.packets.PacketProtocol;
+import com.github.bananikxenos.udppacketer.utils.Compression;
 
 import java.io.*;
 import java.net.DatagramPacket;
@@ -24,20 +25,25 @@ public class UDPServer {
     private boolean running = false;
 
     /* Buffer for packets */
-    private byte[] buf = new byte[1024];
+    private byte[] buf = new byte[2048];
+
+    /* Compression */
+    private boolean useCompression = true;
 
     /**
      * Constructor of the Server
-     * @param packetProtocol packet protocol
+     *
+     * @param packetProtocol        packet protocol
      * @param udpNetworkingListener listener
      */
-    public UDPServer(PacketProtocol packetProtocol, UDPNetworkingListener udpNetworkingListener){
+    public UDPServer(PacketProtocol packetProtocol, UDPNetworkingListener udpNetworkingListener) {
         this.packetProtocol = packetProtocol;
         this.udpNetworkingListener = udpNetworkingListener;
     }
 
     /**
      * Starts the server on port
+     *
      * @param port port
      * @throws SocketException exception
      */
@@ -49,7 +55,7 @@ public class UDPServer {
         // Packet receiver thread
         new Thread(() -> {
             // Loop the receiving
-            while (running){
+            while (running) {
                 // Receive the packet
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 try {
@@ -58,8 +64,18 @@ public class UDPServer {
                     throw new RuntimeException(e);
                 }
 
+                byte[] data = new byte[getBufferSize()];
+
+                System.arraycopy(packet.getData(), 0, data, 0, getBufferSize());
+
+                // Check if compressed
+                if (Compression.isCompressed(data)) {
+                    // Decompress
+                    data = Compression.decompress(data);
+                }
+
                 // Read bytes into Input
-                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(packet.getData());
+                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data);
                 DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
 
                 // Construct the packet
@@ -83,7 +99,26 @@ public class UDPServer {
     }
 
     /**
+     * Use compression
+     *
+     * @param useCompression use compression
+     */
+    public void setUseCompression(boolean useCompression) {
+        this.useCompression = useCompression;
+    }
+
+    /**
+     * Returns if compression is used
+     *
+     * @return use compression
+     */
+    public boolean isCompression() {
+        return useCompression;
+    }
+
+    /**
      * Returns the packet listener
+     *
      * @return Packet Listener
      */
     public UDPNetworkingListener getListener() {
@@ -92,6 +127,7 @@ public class UDPServer {
 
     /**
      * Sets the packet listener
+     *
      * @param listener Packet Listener
      */
     public void setListener(UDPNetworkingListener listener) {
@@ -100,6 +136,7 @@ public class UDPServer {
 
     /**
      * Returns the Packet Protocol
+     *
      * @return Packet Protocol
      */
     public PacketProtocol getPacketProtocol() {
@@ -108,6 +145,7 @@ public class UDPServer {
 
     /**
      * Sets the packet protocol
+     *
      * @param packetProtocol New Packet Protocol
      */
     public void setPacketProtocol(PacketProtocol packetProtocol) {
@@ -116,6 +154,7 @@ public class UDPServer {
 
     /**
      * Returns the port of the server
+     *
      * @return Port
      */
     public int getPort() {
@@ -127,7 +166,7 @@ public class UDPServer {
         new Thread(() -> {
             try {
                 // Create output stream to write data to
-                ByteArrayOutputStream bufferedOutputStream = new ByteArrayOutputStream();
+                ByteArrayOutputStream bufferedOutputStream = new ByteArrayOutputStream(getBufferSize());
                 DataOutputStream dataOutputStream = new DataOutputStream(bufferedOutputStream);
 
                 // Write the packet id
@@ -139,10 +178,17 @@ public class UDPServer {
                 // Gets the bytes from output stream to send
                 byte[] msg = bufferedOutputStream.toByteArray();
 
+                //Check if to use Compression
+                if (isCompression()) {
+                    // Compress
+                    msg = Compression.compress(msg);
+                }
+
                 // Sends the data
                 DatagramPacket p = new DatagramPacket(msg, msg.length, address, port);
                 socket.send(p);
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         }).start();
     }
 
@@ -152,8 +198,10 @@ public class UDPServer {
     public void stop() {
         running = false;
     }
+
     /**
      * Sets the packet receiving buffer
+     *
      * @param size size of the buffer
      */
     public void setBuffer(int size) {
@@ -162,6 +210,7 @@ public class UDPServer {
 
     /**
      * Returns receiving buffer size
+     *
      * @return size
      */
     public int getBufferSize() {

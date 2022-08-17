@@ -69,7 +69,7 @@ public class UDPClient {
                 }
 
                 // Offload the listener to another thread the keep the main receiving (maybe add the whole code into this one after receiving the packet IDK)
-                // TODO: 17. 8. 2022 Test and add the whole constructing process to another thread to keep receiving packets
+                // TODO: 17. 8. 2022 example.Test and add the whole constructing process to another thread to keep receiving packets
                 Packet finalUseFriendlyPacket = useFriendlyPacket; // Copy the packet to temp variable
                 new Thread(() -> {
                     // Check if listener isn't null & packet isn't null

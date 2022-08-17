@@ -39,8 +39,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class TestPacket implements Packet {
-    private String coolText;
-    private long currentTime;
+    public String coolText;
+    public long currentTime;
 
     public TestPacket(String coolText, long currentTime){
         this.coolText = coolText;
@@ -56,22 +56,6 @@ public class TestPacket implements Packet {
     public void write(DataOutputStream out) throws IOException {
         out.writeUTF(this.coolText);
         out.writeLong(this.currentTime);
-    }
-
-    public long getCurrentTime() {
-        return currentTime;
-    }
-
-    public String getCoolText() {
-        return coolText;
-    }
-
-    public void setCoolText(String coolText) {
-        this.coolText = coolText;
-    }
-
-    public void setCurrentTime(long currentTime) {
-        this.currentTime = currentTime;
     }
 }
 ```
@@ -106,7 +90,7 @@ public class UDPServerTest {
             @Override
             public void onPacketReceived(Packet packet, InetAddress address, int port) {
                 if(packet instanceof TestPacket testPacket) {
-                    System.out.println("SERVER >> Received Test Packet With coolString: " + testPacket.getCoolText() + " and Time: " + testPacket.getCurrentTime());
+                    System.out.println("SERVER >> Received Test Packet With coolString: " + testPacket.coolText + " and Time: " + testPacket.currentTime);
                 }
 
                 try {
@@ -142,7 +126,7 @@ public class UDPClientTest {
             @Override
             public void onPacketReceived(Packet packet, InetAddress address, int port) {
                 if(packet instanceof TestPacket testPacket){
-                    System.out.print("CLIENT >> Received Test Packet With coolString: " + testPacket.getCoolText() + " and Time: " + testPacket.getCurrentTime());
+                    System.out.print("CLIENT >> Received Test Packet With coolString: " + testPacket.coolText + " and Time: " + testPacket.currentTime);
                 }
             }
         });
@@ -165,9 +149,7 @@ import java.net.UnknownHostException;
 public class Test {
     public static void main(String[] args) throws SocketException, UnknownHostException, InterruptedException {
         new UDPServerTest();
-
         Thread.sleep(3000L);
-
         new UDPClientTest();
     }
 }

@@ -19,14 +19,16 @@ so its better than Serialization.
 
 ## Roadmap
 
-- Optimize performance and simpilicity
+- Optimize performance and simplicity
 
 - Add Reliable UDP similar to TCP
+
+- AES Encryption
 
 
 ## Usage
 
-First create a packet. Packets need to be read/written in the same order!
+First create a packet. Packets need to be read/written to in the same order!
 
 ```java
 import com.github.bananikxenos.udppacketer.packets.Packet;

@@ -23,6 +23,8 @@ so its better than Serialization.
 
 - Add Reliable UDP similar to TCP
 
+- AES Encryption
+
 
 ## Usage
 

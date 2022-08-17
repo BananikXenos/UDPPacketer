@@ -14,6 +14,7 @@ so its better than Serialization.
 - Listeners
 - Good Performance with Threads
 - Easily Editable for your needs
+- Included [example](src/example/)
 
 
 ## Roadmap
@@ -176,6 +177,13 @@ And after running the code we get this:
 ## Authors
 
 - [BananikXenos](https://github.com/BananikXenos)
+
+
+## Contributing
+
+Contributions are always welcome!
+
+My discord: Synse#3191
 
 
 ## License

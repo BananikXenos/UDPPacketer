@@ -14,6 +14,7 @@ so its better than Serialization.
 - Listeners
 - Good Performance with Threads
 - Easily Editable for your needs
+- Compression
 - Included [example](src/example/)
 
 
@@ -23,7 +24,7 @@ so its better than Serialization.
 
 - Add Reliable UDP similar to TCP
 
-- AES Encryption
+- Encryption
 
 
 ## Usage

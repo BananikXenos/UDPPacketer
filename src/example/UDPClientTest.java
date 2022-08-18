@@ -1,24 +1,34 @@
 package example;
 
 import com.github.bananikxenos.udppacketer.UDPClient;
-import com.github.bananikxenos.udppacketer.listener.UDPNetworkingListener;
+import com.github.bananikxenos.udppacketer.connections.Connection;
+import com.github.bananikxenos.udppacketer.listener.ClientListener;
+import com.github.bananikxenos.udppacketer.listener.ServerListener;
 import com.github.bananikxenos.udppacketer.packets.Packet;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 
 public class UDPClientTest {
     private UDPClient client;
 
-    public UDPClientTest() throws SocketException, UnknownHostException {
-        this.client = new UDPClient(new ExampleProtocol(), new UDPNetworkingListener() {
+    public UDPClientTest() throws IOException, InterruptedException {
+        this.client = new UDPClient(new ExampleProtocol(), new ClientListener() {
             @Override
-            public void onPacketReceived(Packet packet, InetAddress address, int port) {
+            public void onPacketReceived(Packet packet) {
                 if(packet instanceof TestPacket testPacket){
                     System.out.print("CLIENT >> Received example.Test Packet With coolString: " + testPacket.getCoolText() + " and Time: " + testPacket.getCurrentTime());
                 }
+            }
+
+            @Override
+            public void onConnected() {
+                System.out.println("CLIENT >> Connected to server.");
+            }
+
+            @Override
+            public void onDisconnected() {
+                System.out.println("CLIENT >> Disconnected.");
             }
         });
 
@@ -29,5 +39,9 @@ public class UDPClientTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        Thread.sleep(5000L);
+
+        this.client.close();
     }
 }

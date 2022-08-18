@@ -1,16 +1,19 @@
 package com.github.bananikxenos.udppacketer;
 
-import com.github.bananikxenos.udppacketer.listener.UDPNetworkingListener;
+import com.github.bananikxenos.udppacketer.connections.Connection;
+import com.github.bananikxenos.udppacketer.listener.ServerListener;
 import com.github.bananikxenos.udppacketer.packets.Packet;
 import com.github.bananikxenos.udppacketer.packets.PacketProtocol;
-import com.github.bananikxenos.udppacketer.packets.sending.PacketsSendMode;
+import com.github.bananikxenos.udppacketer.packets.headers.PacketsSendMode;
 import com.github.bananikxenos.udppacketer.threads.server.ServerReceiveThread;
+import com.github.bananikxenos.udppacketer.threads.server.ServerRttThread;
 import com.github.bananikxenos.udppacketer.threads.server.ServerSendThread;
 
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class UDPServer {
     /* Clients socket */
@@ -20,11 +23,12 @@ public class UDPServer {
     private PacketProtocol packetProtocol;
 
     /* Clients packet listener */
-    private UDPNetworkingListener udpNetworkingListener;
+    private ServerListener serverListener;
 
     /* Threads */
     private ServerReceiveThread serverReceiveThread;
     private ServerSendThread serverSendThread;
+    private ServerRttThread serverRttThread;
 
     /* Packet Send Mode */
     private PacketsSendMode packetsSendMode = PacketsSendMode.POLL;
@@ -35,15 +39,20 @@ public class UDPServer {
     /* Compression */
     private boolean useCompression = true;
 
+    /* Connections */
+    private CopyOnWriteArrayList<Connection> connections = new CopyOnWriteArrayList<>();
+
+    private long clientTimeout = 15_000L;
+
     /**
      * Constructor of the Server
      *
      * @param packetProtocol        packet protocol
-     * @param udpNetworkingListener listener
+     * @param serverListener listener
      */
-    public UDPServer(PacketProtocol packetProtocol, UDPNetworkingListener udpNetworkingListener) {
+    public UDPServer(PacketProtocol packetProtocol, ServerListener serverListener) {
         this.packetProtocol = packetProtocol;
-        this.udpNetworkingListener = udpNetworkingListener;
+        this.serverListener = serverListener;
     }
 
     /**
@@ -52,7 +61,7 @@ public class UDPServer {
      * @param port port
      * @throws SocketException exception
      */
-    public void start(int port) throws SocketException {
+    public synchronized void start(int port) throws SocketException {
         if(this.socket != null && !this.socket.isClosed())
             stop();
 
@@ -65,6 +74,9 @@ public class UDPServer {
         // Packet send thread
         this.serverSendThread = new ServerSendThread(this);
         this.serverSendThread.start();
+
+        this.serverRttThread = new ServerRttThread(this);
+        this.serverRttThread.start();
     }
 
     /**
@@ -94,8 +106,8 @@ public class UDPServer {
      *
      * @return Packet Listener
      */
-    public UDPNetworkingListener getListener() {
-        return this.udpNetworkingListener;
+    public ServerListener getListener() {
+        return this.serverListener;
     }
 
     /**
@@ -103,8 +115,8 @@ public class UDPServer {
      *
      * @param listener Packet Listener
      */
-    public void setListener(UDPNetworkingListener listener) {
-        this.udpNetworkingListener = listener;
+    public void setListener(ServerListener listener) {
+        this.serverListener = listener;
     }
 
     /**
@@ -134,9 +146,9 @@ public class UDPServer {
         return this.socket.getPort();
     }
 
-    public void send(InetAddress address, int port, Packet packet) throws IOException {
+    public void send(Connection connection, Packet packet) throws IOException {
         // Sends packet with settings
-        serverSendThread.addToSending(packet, address, port);
+        serverSendThread.addToSending(packet, connection.getAddress(), connection.getPort());
     }
 
     /**
@@ -147,6 +159,7 @@ public class UDPServer {
 
         this.serverSendThread.stop();
         this.serverReceiveThread.stop();
+        this.serverRttThread.stop();
     }
 
     /**
@@ -189,5 +202,29 @@ public class UDPServer {
      */
     public PacketsSendMode getPacketsSendMode() {
         return packetsSendMode;
+    }
+
+    public CopyOnWriteArrayList<Connection> getConnections() {
+        return connections;
+    }
+
+    public ServerReceiveThread getServerReceiveThread() {
+        return serverReceiveThread;
+    }
+
+    public ServerSendThread getServerSendThread() {
+        return serverSendThread;
+    }
+
+    public ServerRttThread getServerRttThread() {
+        return serverRttThread;
+    }
+
+    public void setClientTimeout(long clientTimeout) {
+        this.clientTimeout = clientTimeout;
+    }
+
+    public long getClientTimeout() {
+        return clientTimeout;
     }
 }

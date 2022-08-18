@@ -1,12 +1,18 @@
 package com.github.bananikxenos.udppacketer;
 
-import com.github.bananikxenos.udppacketer.listener.UDPNetworkingListener;
+import com.github.bananikxenos.udppacketer.listener.ClientListener;
+import com.github.bananikxenos.udppacketer.listener.ServerListener;
 import com.github.bananikxenos.udppacketer.packets.Packet;
 import com.github.bananikxenos.udppacketer.packets.PacketProtocol;
-import com.github.bananikxenos.udppacketer.packets.sending.PacketsSendMode;
+import com.github.bananikxenos.udppacketer.packets.headers.PacketHeader;
+import com.github.bananikxenos.udppacketer.packets.headers.PacketsSendMode;
 import com.github.bananikxenos.udppacketer.threads.client.ClientReceiveThread;
+import com.github.bananikxenos.udppacketer.threads.client.ClientRttThread;
 import com.github.bananikxenos.udppacketer.threads.client.ClientSendThread;
+import com.github.bananikxenos.udppacketer.utils.Timer;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -27,11 +33,12 @@ public class UDPClient {
     private PacketProtocol packetProtocol;
 
     /* Clients packet listener */
-    private UDPNetworkingListener listener;
+    private ClientListener listener;
 
     /* Threads */
     private ClientReceiveThread clientReceiveThread;
     private ClientSendThread clientSendThread;
+    private ClientRttThread clientRttThread;
 
     /* Packet Send Mode */
     private PacketsSendMode packetsSendMode = PacketsSendMode.POLL;
@@ -39,8 +46,17 @@ public class UDPClient {
     /* Buffer for packets */
     private byte[] buf = new byte[2048];
 
+    private boolean connected = false;
+
+    private double SmoothRTT = 400;
+
     /* Compression */
     private boolean useCompression = true;
+
+    private Timer RttSendTimer = new Timer();
+    private Timer DisconnectTimer = new Timer();
+
+    private long DisconnectTime = 15_000L;
 
     /**
      * Constructor of UDP Client
@@ -48,7 +64,7 @@ public class UDPClient {
      * @param packetProtocol packet protocol
      * @param listener       packet listener
      */
-    public UDPClient(PacketProtocol packetProtocol, UDPNetworkingListener listener) {
+    public UDPClient(PacketProtocol packetProtocol, ClientListener listener) {
         // Set values
         this.packetProtocol = packetProtocol;
         this.listener = listener;
@@ -61,7 +77,7 @@ public class UDPClient {
      * @throws SocketException indicate that there is an error creating or accessing a Socket
      * @throws UnknownHostException indicate that the IP address of a host could not be determined
      */
-    public void connect(String ip, int port) throws SocketException, UnknownHostException {
+    public synchronized void connect(String ip, int port) throws IOException {
         if(this.socket != null && !this.socket.isClosed())
             close();
 
@@ -76,6 +92,16 @@ public class UDPClient {
         // Packet send thread
         this.clientSendThread = new ClientSendThread(this);
         this.clientSendThread.start();
+
+        this.clientRttThread = new ClientRttThread(this);
+        this.clientRttThread.start();
+
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+
+        dataOutputStream.writeInt(PacketHeader.CONNECT.ordinal());
+
+        this.clientSendThread.sendPacket(byteArrayOutputStream.toByteArray());
     }
 
     /**
@@ -119,7 +145,7 @@ public class UDPClient {
      *
      * @return Packet Listener
      */
-    public UDPNetworkingListener getListener() {
+    public ClientListener getListener() {
         return listener;
     }
 
@@ -128,7 +154,7 @@ public class UDPClient {
      *
      * @param listener Packet Listener
      */
-    public void setListener(UDPNetworkingListener listener) {
+    public void setListener(ClientListener listener) {
         this.listener = listener;
     }
 
@@ -182,11 +208,22 @@ public class UDPClient {
     /**
      * Closes the client
      */
-    public void close() {
+    public void close() throws IOException {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+
+        dataOutputStream.writeInt(PacketHeader.DISCONNECT.ordinal());
+
+        this.clientSendThread.sendPacket(byteArrayOutputStream.toByteArray());
+
+        if (getListener() != null)
+            getListener().onDisconnected(); // Execute the listener
+
         socket.close();
 
         this.clientSendThread.stop();
         this.clientReceiveThread.stop();
+        this.clientRttThread.stop();
     }
 
     /**
@@ -219,5 +256,50 @@ public class UDPClient {
      */
     public PacketsSendMode getPacketsSendMode() {
         return packetsSendMode;
+    }
+
+    public ClientReceiveThread getClientReceiveThread() {
+        return clientReceiveThread;
+    }
+
+    public ClientSendThread getClientSendThread() {
+        return clientSendThread;
+    }
+
+    public boolean isConnected() {
+        return connected;
+    }
+
+    @Deprecated
+    public void setConnected(boolean connected) {
+        this.connected = connected;
+    }
+
+    public double getRTT() {
+        return SmoothRTT;
+    }
+
+    public void setSmoothRTT(double value) {
+        this.SmoothRTT = this.SmoothRTT * 0.7 + value * 0.3;
+    }
+
+    public Timer getRttSendTimer() {
+        return RttSendTimer;
+    }
+
+    public ClientRttThread getClientRttThread() {
+        return clientRttThread;
+    }
+
+    public Timer getDisconnectTimer() {
+        return DisconnectTimer;
+    }
+
+    public void setDisconnectTime(long disconnectTime) {
+        DisconnectTime = disconnectTime;
+    }
+
+    public long getDisconnectTime() {
+        return DisconnectTime;
     }
 }

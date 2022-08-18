@@ -17,7 +17,7 @@ public class UDPClientTest {
             @Override
             public void onPacketReceived(Packet packet) {
                 if(packet instanceof TestPacket testPacket){
-                    System.out.print("CLIENT >> Received example.Test Packet With coolString: " + testPacket.getCoolText() + " and Time: " + testPacket.getCurrentTime());
+                    System.out.println("CLIENT >> Received example.Test Packet With coolString: " + testPacket.getCoolText() + " and Time: " + testPacket.getCurrentTime());
                 }
             }
 

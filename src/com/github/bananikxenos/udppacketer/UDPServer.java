@@ -77,6 +77,8 @@ public class UDPServer {
 
         this.serverRttThread = new ServerRttThread(this);
         this.serverRttThread.start();
+
+        System.out.println("SERVER >> Server Started.");
     }
 
     /**
@@ -160,6 +162,8 @@ public class UDPServer {
         this.serverSendThread.stop();
         this.serverReceiveThread.stop();
         this.serverRttThread.stop();
+
+        System.out.println("SERVER >> Server Closed.");
     }
 
     /**

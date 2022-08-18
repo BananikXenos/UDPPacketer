@@ -197,6 +197,7 @@ public class UDPServer {
      */
     public void stop() {
         running = false;
+        socket.close();
     }
 
     /**

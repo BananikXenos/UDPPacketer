@@ -51,7 +51,7 @@ public class UDPClient {
         // Packet receiver thread
         new Thread(() -> {
             // Loop the receiving
-            while (true) {
+            while (!socket.isClosed()) {
                 // Receive the packet
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
                 try {
@@ -163,7 +163,7 @@ public class UDPClient {
      * @param packet packet
      * @throws IOException exception
      */
-    public void sendData(Packet packet) throws IOException {
+    public void send(Packet packet) throws IOException {
         // Run on new thread
         new Thread(() -> {
             try {

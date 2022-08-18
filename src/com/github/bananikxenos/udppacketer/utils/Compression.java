@@ -6,7 +6,7 @@ import java.util.zip.InflaterOutputStream;
 
 public class Compression {
 
-    public static final byte[] MAGIC_HEADER = "UDPPacketer".getBytes();
+    public static final byte[] MAGIC_HEADER = "§ˇ".getBytes();
 
     /**
      * Compresses byte array

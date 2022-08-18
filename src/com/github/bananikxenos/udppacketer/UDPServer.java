@@ -3,10 +3,11 @@ package com.github.bananikxenos.udppacketer;
 import com.github.bananikxenos.udppacketer.listener.UDPNetworkingListener;
 import com.github.bananikxenos.udppacketer.packets.Packet;
 import com.github.bananikxenos.udppacketer.packets.PacketProtocol;
-import com.github.bananikxenos.udppacketer.utils.Compression;
+import com.github.bananikxenos.udppacketer.packets.sending.PacketsSendMode;
+import com.github.bananikxenos.udppacketer.threads.server.ServerReceiveThread;
+import com.github.bananikxenos.udppacketer.threads.server.ServerSendThread;
 
-import java.io.*;
-import java.net.DatagramPacket;
+import java.io.IOException;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -21,8 +22,12 @@ public class UDPServer {
     /* Clients packet listener */
     private UDPNetworkingListener udpNetworkingListener;
 
-    /* Is server running */
-    private boolean running = false;
+    /* Threads */
+    private ServerReceiveThread serverReceiveThread;
+    private ServerSendThread serverSendThread;
+
+    /* Packet Send Mode */
+    private PacketsSendMode packetsSendMode = PacketsSendMode.POLL;
 
     /* Buffer for packets */
     private byte[] buf = new byte[2048];
@@ -48,54 +53,18 @@ public class UDPServer {
      * @throws SocketException exception
      */
     public void start(int port) throws SocketException {
+        if(this.socket != null && !this.socket.isClosed())
+            stop();
+
         // Set values
-        socket = new DatagramSocket(port);
-        running = true;
+        this.socket = new DatagramSocket(port);
 
-        // Packet receiver thread
-        new Thread(() -> {
-            // Loop the receiving
-            while (running) {
-                // Receive the packet
-                DatagramPacket packet = new DatagramPacket(buf, buf.length);
-                try {
-                    socket.receive(packet);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                byte[] data = new byte[getBufferSize()];
-
-                System.arraycopy(packet.getData(), 0, data, 0, getBufferSize());
-
-                // Check if compressed
-                if (Compression.isCompressed(data)) {
-                    // Decompress
-                    data = Compression.decompress(data);
-                }
-
-                // Read bytes into Input
-                ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data);
-                DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
-
-                // Construct the packet
-                Packet useFriendlyPacket = null;
-                try {
-                    useFriendlyPacket = packetProtocol.createClientboundPacket(dataInputStream.readInt(), dataInputStream);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-
-                // Offload the listener to another thread the keep the main receiving (maybe add the whole code into this one after receiving the packet IDK)
-                // TODO: 17. 8. 2022 example.Test and add the whole constructing process to another thread to keep receiving packets
-                Packet finalUseFriendlyPacket = useFriendlyPacket; // Copy the packet to temp variable
-                new Thread(() -> {
-                    // Check if listener isn't null & packet isn't null
-                    if (this.udpNetworkingListener != null && finalUseFriendlyPacket != null)
-                        this.udpNetworkingListener.onPacketReceived(finalUseFriendlyPacket, packet.getAddress(), packet.getPort()); // Execute the listener
-                }).start();
-            }
-        }).start();
+        // Packet receive thread
+        this.serverReceiveThread = new ServerReceiveThread(this);
+        this.serverReceiveThread.start();
+        // Packet send thread
+        this.serverSendThread = new ServerSendThread(this);
+        this.serverSendThread.start();
     }
 
     /**
@@ -113,7 +82,11 @@ public class UDPServer {
      * @return use compression
      */
     public boolean isCompression() {
-        return useCompression;
+        return this.useCompression;
+    }
+
+    public DatagramSocket getSocket() {
+        return this.socket;
     }
 
     /**
@@ -122,7 +95,7 @@ public class UDPServer {
      * @return Packet Listener
      */
     public UDPNetworkingListener getListener() {
-        return udpNetworkingListener;
+        return this.udpNetworkingListener;
     }
 
     /**
@@ -140,7 +113,7 @@ public class UDPServer {
      * @return Packet Protocol
      */
     public PacketProtocol getPacketProtocol() {
-        return packetProtocol;
+        return this.packetProtocol;
     }
 
     /**
@@ -158,46 +131,22 @@ public class UDPServer {
      * @return Port
      */
     public int getPort() {
-        return socket.getPort();
+        return this.socket.getPort();
     }
 
     public void send(InetAddress address, int port, Packet packet) throws IOException {
-        // Run on new thread
-        new Thread(() -> {
-            try {
-                // Create output stream to write data to
-                ByteArrayOutputStream bufferedOutputStream = new ByteArrayOutputStream(getBufferSize());
-                DataOutputStream dataOutputStream = new DataOutputStream(bufferedOutputStream);
-
-                // Write the packet id
-                dataOutputStream.writeInt(packetProtocol.getClientboundId(packet));
-
-                // Write the packet data to output stream
-                packet.write(dataOutputStream);
-
-                // Gets the bytes from output stream to send
-                byte[] msg = bufferedOutputStream.toByteArray();
-
-                //Check if to use Compression
-                if (isCompression()) {
-                    // Compress
-                    msg = Compression.compress(msg);
-                }
-
-                // Sends the data
-                DatagramPacket p = new DatagramPacket(msg, msg.length, address, port);
-                socket.send(p);
-            } catch (IOException ignored) {
-            }
-        }).start();
+        // Sends packet with settings
+        serverSendThread.addToSending(packet, address, port);
     }
 
     /**
      * Stops the server
      */
     public void stop() {
-        running = false;
-        socket.close();
+        this.socket.close();
+
+        this.serverSendThread.stop();
+        this.serverReceiveThread.stop();
     }
 
     /**
@@ -215,7 +164,30 @@ public class UDPServer {
      * @return size
      */
     public int getBufferSize() {
-        return buf.length;
+        return this.buf.length;
     }
 
+    /**
+     * Returns byte buffer for receiving
+     * @return buffer for receiving
+     */
+    public byte[] getBuffer() {
+        return this.buf;
+    }
+
+    /**
+     * Sets mode for sending packets
+     * @param packetsSendMode mode for sending packets
+     */
+    public void setPacketsSendMode(PacketsSendMode packetsSendMode) {
+        this.packetsSendMode = packetsSendMode;
+    }
+
+    /**
+     * Returns mode for sending packets
+     * @return mode for sending packets
+     */
+    public PacketsSendMode getPacketsSendMode() {
+        return packetsSendMode;
+    }
 }

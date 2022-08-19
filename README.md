@@ -11,9 +11,9 @@ so its better than Serialization.
 - Simple UDP Networking
 - Packet Protocol
 - Client/Server classes
-- Listeners
+- Multiple Listeners
 - Good Performance with Threads
-- Easily Editable for your needs
+- Connection Management
 - Compression
 - Included [example](src/example/)
 
@@ -25,6 +25,8 @@ so its better than Serialization.
 - Add Reliable UDP similar to TCP
 
 - Encryption
+
+- Kicking a connection
 
 
 ## Usage

@@ -13,11 +13,17 @@ public class UDPClientTest {
     private UDPClient client;
 
     public UDPClientTest() throws IOException, InterruptedException {
-        this.client = new UDPClient(new ExampleProtocol(), new ClientListener() {
+        this.client = new UDPClient(new ExampleProtocol());
+        this.client.addListener(new ClientListener() {
             @Override
             public void onPacketReceived(Packet packet) {
                 if(packet instanceof TestPacket testPacket){
                     System.out.println("CLIENT >> Received example.Test Packet With coolString: " + testPacket.getCoolText() + " and Time: " + testPacket.getCurrentTime());
+                    try {
+                        client.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
 
@@ -39,9 +45,5 @@ public class UDPClientTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        Thread.sleep(5000L);
-
-        this.client.close();
     }
 }

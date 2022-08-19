@@ -1,23 +1,17 @@
 package com.github.bananikxenos.udppacketer;
 
 import com.github.bananikxenos.udppacketer.listener.ClientListener;
-import com.github.bananikxenos.udppacketer.listener.ServerListener;
 import com.github.bananikxenos.udppacketer.packets.Packet;
 import com.github.bananikxenos.udppacketer.packets.PacketProtocol;
 import com.github.bananikxenos.udppacketer.packets.headers.PacketHeader;
 import com.github.bananikxenos.udppacketer.packets.headers.PacketsSendMode;
-import com.github.bananikxenos.udppacketer.threads.client.ClientReceiveThread;
-import com.github.bananikxenos.udppacketer.threads.client.ClientRttThread;
-import com.github.bananikxenos.udppacketer.threads.client.ClientSendThread;
+import com.github.bananikxenos.udppacketer.utils.Compression;
 import com.github.bananikxenos.udppacketer.utils.Timer;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
+import java.io.*;
+import java.lang.reflect.InvocationTargetException;
+import java.net.*;
+import java.util.ArrayList;
 
 public class UDPClient {
     /* Clients socket */
@@ -33,7 +27,7 @@ public class UDPClient {
     private PacketProtocol packetProtocol;
 
     /* Clients packet listener */
-    private ClientListener listener;
+    private final ArrayList<ClientListener> listeners = new ArrayList<>();
 
     /* Threads */
     private ClientReceiveThread clientReceiveThread;
@@ -46,28 +40,30 @@ public class UDPClient {
     /* Buffer for packets */
     private byte[] buf = new byte[2048];
 
+    /* Is Client Connected */
     private boolean connected = false;
 
+    /* Smoothed Round Trip Time */
     private double SmoothRTT = 400;
 
     /* Compression */
     private boolean useCompression = true;
 
-    private Timer RttSendTimer = new Timer();
-    private Timer DisconnectTimer = new Timer();
+    /* TimeOut Timers */
+    private final Timer RttSendTimer = new Timer();
+    private final Timer DisconnectTimer = new Timer();
 
-    private long DisconnectTime = 15_000L;
+    /* Disconnect Time */
+    private long TimeoutTime = 15_000L;
 
     /**
      * Constructor of UDP Client
      *
      * @param packetProtocol packet protocol
-     * @param listener       packet listener
      */
-    public UDPClient(PacketProtocol packetProtocol, ClientListener listener) {
+    public UDPClient(PacketProtocol packetProtocol) {
         // Set values
         this.packetProtocol = packetProtocol;
-        this.listener = listener;
     }
 
     /**
@@ -96,12 +92,7 @@ public class UDPClient {
         this.clientRttThread = new ClientRttThread(this);
         this.clientRttThread.start();
 
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-
-        dataOutputStream.writeInt(PacketHeader.CONNECT.ordinal());
-
-        this.clientSendThread.sendPacket(byteArrayOutputStream.toByteArray());
+        new ClientConnectThread(this).start();
     }
 
     /**
@@ -141,21 +132,30 @@ public class UDPClient {
     }
 
     /**
-     * Returns the packet listener
+     * Returns the packet listener list
      *
-     * @return Packet Listener
+     * @return Packet Listener list
      */
-    public ClientListener getListener() {
-        return listener;
+    public ArrayList<ClientListener> getListeners() {
+        return listeners;
     }
 
     /**
-     * Sets the packet listener
+     * Adds packet listener
      *
      * @param listener Packet Listener
      */
-    public void setListener(ClientListener listener) {
-        this.listener = listener;
+    public void addListener(ClientListener listener) {
+        this.listeners.add(listener);
+    }
+
+    /**
+     * Removes packet listener
+     *
+     * @param listener Packet Listener
+     */
+    public void removeListener(ClientListener listener) {
+        this.listeners.remove(listener);
     }
 
     /**
@@ -216,8 +216,10 @@ public class UDPClient {
 
         this.clientSendThread.sendPacket(byteArrayOutputStream.toByteArray());
 
-        if (getListener() != null)
-            getListener().onDisconnected(); // Execute the listener
+        this.connected = false;
+
+        for(ClientListener listener : listeners)
+            listener.onDisconnected();
 
         socket.close();
 
@@ -258,48 +260,284 @@ public class UDPClient {
         return packetsSendMode;
     }
 
+    /**
+     * Returns the thread for Receiving Packets
+     * @return Thread for Receiving Packets
+     */
     public ClientReceiveThread getClientReceiveThread() {
         return clientReceiveThread;
     }
 
+    /**
+     * Returns the thread for Sending Packets
+     * @return Thread for Sending Packets
+     */
     public ClientSendThread getClientSendThread() {
         return clientSendThread;
     }
 
-    public boolean isConnected() {
-        return connected;
-    }
-
-    @Deprecated
-    public void setConnected(boolean connected) {
-        this.connected = connected;
-    }
-
-    public double getRTT() {
-        return SmoothRTT;
-    }
-
-    public void setSmoothRTT(double value) {
-        this.SmoothRTT = this.SmoothRTT * 0.7 + value * 0.3;
-    }
-
-    public Timer getRttSendTimer() {
-        return RttSendTimer;
-    }
-
+    /**
+     * Returns the thread for KeepAlive and RTT
+     * @return Thread for KeepAlive and RTT
+     */
     public ClientRttThread getClientRttThread() {
         return clientRttThread;
     }
 
-    public Timer getDisconnectTimer() {
-        return DisconnectTimer;
+    /**
+     * Returns if client is connected
+     * @return Connected
+     */
+    public boolean isConnected() {
+        return connected;
     }
 
-    public void setDisconnectTime(long disconnectTime) {
-        DisconnectTime = disconnectTime;
+    /**
+     * Returns the Round Trip Time
+     * @return Round Trip Time
+     */
+    public double getRTT() {
+        return SmoothRTT;
     }
 
-    public long getDisconnectTime() {
-        return DisconnectTime;
+    /**
+     * Sets the RTT Smoothly
+     * @param value value
+     */
+    private void setSmoothRTT(double value) {
+        this.SmoothRTT = this.SmoothRTT * 0.7 + value * 0.3;
+    }
+
+    /**
+     * Sets the Time you get timed out
+     * @param timeoutTime time in millis
+     */
+    public void setTimeoutTime(long timeoutTime) {
+        TimeoutTime = timeoutTime;
+    }
+
+    /**
+     * Returns the timeout time
+     * @return timeout time
+     */
+    public long getTimeoutTime() {
+        return TimeoutTime;
+    }
+
+    private class ClientReceiveThread extends Thread {
+        private final UDPClient udpClient;
+
+        ClientReceiveThread(UDPClient udpClient) {
+            this.udpClient = udpClient;
+        }
+
+        @Override
+        public void run() {
+            // Loop the receiving
+            while (!udpClient.getSocket().isClosed()) {
+                // Receive the packet
+                DatagramPacket packet = new DatagramPacket(udpClient.getBuffer(), udpClient.getBufferSize());
+                try {
+                    udpClient.getSocket().receive(packet);
+
+                    new Thread(() -> {
+                        try {
+                            byte[] data = packet.getData();
+
+                            // Check if compressed
+                            if (Compression.isCompressed(data)) {
+                                // Decompress
+                                data = Compression.decompress(data);
+                            }
+
+                            // Read bytes into Input
+                            ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data);
+                            DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+
+                            PacketHeader packetHeader = PacketHeader.values()[dataInputStream.readInt()];
+
+                            if(packetHeader == PacketHeader.CONNECTED){
+                                udpClient.connected = true;
+                                for(ClientListener listener : udpClient.getListeners())
+                                    listener.onConnected();
+                            } else if (packetHeader == PacketHeader.PACKET){
+                                // Construct the packet
+                                Packet pPacket = udpClient.getPacketProtocol().createServerboundPacket(dataInputStream.readInt(), dataInputStream);
+
+                                // Check if listener isn't null & packet isn't null
+                                if (pPacket != null)
+                                    for(ClientListener listener : udpClient.getListeners())
+                                        listener.onPacketReceived(pPacket);
+                            } else if (packetHeader == PacketHeader.DISCONNECT) {
+                                udpClient.connected = false;
+                                udpClient.close();
+                            } else if (packetHeader == PacketHeader.RTT_REPLY){
+                                double ping = System.currentTimeMillis() - dataInputStream.readLong();
+                                udpClient.setSmoothRTT(ping);
+                                udpClient.DisconnectTimer.reset();
+                            } else if (packetHeader == PacketHeader.RTT_REQUEST){
+                                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                                DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+
+                                dataOutputStream.writeInt(PacketHeader.RTT_REPLY.ordinal());
+
+                                dataOutputStream.writeLong(dataInputStream.readLong());
+
+                                this.udpClient.getClientSendThread().sendPacket(byteArrayOutputStream.toByteArray());
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        } catch (InstantiationException e) {
+                            throw new RuntimeException(e);
+                        } catch (IllegalAccessException e) {
+                            throw new RuntimeException(e);
+                        } catch (InvocationTargetException e) {
+                            throw new RuntimeException(e);
+                        } catch (NoSuchMethodException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }).start();
+                } catch (IOException ignored) {
+
+                }
+            }
+        }
+    }
+
+    private class ClientRttThread extends Thread {
+        private final UDPClient udpClient;
+
+        ClientRttThread(UDPClient udpClient) {
+            this.udpClient = udpClient;
+        }
+
+        @Override
+        public void run() {
+            while (udpClient != null && udpClient.getSocket() != null && !udpClient.getSocket().isClosed()) {
+                if (udpClient.RttSendTimer.hasElapsed(5_000L, true) && udpClient.isConnected()) {
+                    try {
+                        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                        DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+
+                        dataOutputStream.writeInt(PacketHeader.RTT_REQUEST.ordinal());
+                        dataOutputStream.writeLong(System.currentTimeMillis());
+
+                        udpClient.getClientSendThread().sendPacket(byteArrayOutputStream.toByteArray());
+                    }catch (Exception ignored){}
+                }
+
+                if(udpClient.DisconnectTimer.hasElapsed(udpClient.getTimeoutTime(), false)){
+                    try {
+                        this.udpClient.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        }
+    }
+
+    private class ClientSendThread extends Thread {
+        private final UDPClient udpClient;
+
+        private final ArrayList<Packet> pendingPackets = new ArrayList<>();
+
+        ClientSendThread(UDPClient udpClient) {
+            this.udpClient = udpClient;
+        }
+
+        @Override
+        public void run() {
+            while (udpClient != null && udpClient.getSocket() != null && !udpClient.getSocket().isClosed()) {
+                if (!this.pendingPackets.isEmpty() && udpClient.isConnected()) {
+                    sendPacket(pendingPackets.remove(0));
+                }
+            }
+        }
+
+        private void sendPacketNewThread(Packet pendingPacket) {
+            new Thread(() -> sendPacket(pendingPacket)).start();
+        }
+
+        private void sendPacket(Packet packet) {
+            try {
+                // Create output stream to write data to
+                ByteArrayOutputStream bufferedOutputStream = new ByteArrayOutputStream(udpClient.getBufferSize());
+                DataOutputStream dataOutputStream = new DataOutputStream(bufferedOutputStream);
+
+                dataOutputStream.writeInt(PacketHeader.PACKET.ordinal());
+
+                // Write the packet id
+                dataOutputStream.writeInt(udpClient.getPacketProtocol().getClientboundId(packet));
+
+                // Write the packet data to output stream
+                packet.write(dataOutputStream);
+
+                // Gets the bytes from output stream to send
+                byte[] msg = bufferedOutputStream.toByteArray();
+
+                //Check if to use Compression
+                if (udpClient.isCompression()) {
+                    // Compress
+                    msg = Compression.compress(msg);
+                }
+
+                // Sends the data
+                DatagramPacket p = new DatagramPacket(msg, msg.length, udpClient.getAddress(), udpClient.getPort());
+                udpClient.getSocket().send(p);
+            } catch (IOException ignored) {}
+        }
+
+        public void sendPacket(byte[] data) {
+            try {
+                // Gets the bytes from output stream to send
+                byte[] msg = data;
+
+                //Check if to use Compression
+                if (udpClient.isCompression()) {
+                    // Compress
+                    msg = Compression.compress(msg);
+                }
+
+                // Sends the data
+                DatagramPacket p = new DatagramPacket(msg, msg.length, udpClient.getAddress(), udpClient.getPort());
+                udpClient.getSocket().send(p);
+            } catch (IOException ignored) {}
+        }
+
+        public void addToSending(Packet packet) {
+            if (this.udpClient.getPacketsSendMode() == PacketsSendMode.POLL)
+                pendingPackets.add(packet);
+            else if (this.udpClient.isConnected())
+                sendPacketNewThread(packet);
+        }
+    }
+
+    private class ClientConnectThread extends Thread {
+        private final UDPClient udpClient;
+
+        private final Timer reconnectTimer = new Timer();
+
+        ClientConnectThread(UDPClient udpClient) {
+            this.udpClient = udpClient;
+        }
+
+        @Override
+        public void run() {
+            while(!udpClient.isConnected() && this.udpClient.clientSendThread.isAlive() && this.udpClient.clientRttThread.isAlive() && this.udpClient.clientReceiveThread.isAlive()) {
+                if(reconnectTimer.hasElapsed(2_000L, true)) {
+                    try {
+                        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                        DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+
+                        dataOutputStream.writeInt(PacketHeader.CONNECT.ordinal());
+
+                        this.udpClient.clientSendThread.sendPacket(byteArrayOutputStream.toByteArray());
+
+                        System.out.println("Connecting...");
+                    }catch (IOException ignored){}
+                }
+            }
+        }
     }
 }

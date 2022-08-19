@@ -1,10 +1,12 @@
 package com.github.bananikxenos.udppacketer.packets;
 
+import sun.reflect.ReflectionFactory;
+
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Map;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.*;
 
 public abstract class PacketProtocol {
     private final Map<Integer, PacketDefinition<? extends Packet>> serverbound = new HashMap<>();
@@ -28,12 +30,11 @@ public abstract class PacketProtocol {
      *
      * @param id      Id to register the packet to.
      * @param packet  Packet to register.
-     * @param factory The packet factory.
      * @throws IllegalArgumentException If the packet fails a test creation when being registered as serverbound.
      */
-    public final <T extends Packet> void register(int id, Class<T> packet, PacketFactory<T> factory) {
-        this.registerServerbound(id, packet, factory);
-        this.registerClientbound(id, packet, factory);
+    public final <T extends Packet> void register(int id, Class<T> packet) {
+        this.registerServerbound(id, packet);
+        this.registerClientbound(id, packet);
     }
 
     /**
@@ -52,11 +53,10 @@ public abstract class PacketProtocol {
      *
      * @param id      Id to register the packet to.
      * @param packet  Packet to register.
-     * @param factory The packet factory.
      * @throws IllegalArgumentException If the packet fails a test creation.
      */
-    public final <T extends Packet> void registerServerbound(int id, Class<T> packet, PacketFactory<T> factory) {
-        this.registerServerbound(new PacketDefinition<>(id, packet, factory));
+    public final <T extends Packet> void registerServerbound(int id, Class<T> packet) {
+        this.registerServerbound(new PacketDefinition<>(id, packet));
     }
 
     /**
@@ -74,10 +74,9 @@ public abstract class PacketProtocol {
      *
      * @param id     Id to register the packet to.
      * @param packet  Packet to register.
-     * @param factory The packet factory.
      */
-    public final <T extends Packet> void registerClientbound(int id, Class<T> packet, PacketFactory<T> factory) {
-        this.registerClientbound(new PacketDefinition<>(id, packet, factory));
+    public final <T extends Packet> void registerClientbound(int id, Class<T> packet) {
+        this.registerClientbound(new PacketDefinition<>(id, packet));
     }
 
     /**
@@ -98,13 +97,19 @@ public abstract class PacketProtocol {
      * @throws IOException if there was an IO error whilst reading the packet.
      * @throws IllegalArgumentException If the packet ID is not registered.
      */
-    public Packet createClientboundPacket(int id, DataInputStream in) throws IOException {
+    public Packet createClientboundPacket(int id, DataInputStream in) throws IOException, InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         PacketDefinition<?> definition = this.clientbound.get(id);
         if (definition == null) {
             throw new IllegalArgumentException("Invalid packet id: " + id);
         }
 
-        return definition.getFactory().construct(in);
+        final Class<?> myClass = definition.getPacketClass();
+        final ReflectionFactory reflection = ReflectionFactory.getReflectionFactory();
+        final Constructor<Packet> constructor = (Constructor<Packet>) reflection.newConstructorForSerialization(myClass, Packet.class.getDeclaredConstructor(new Class[0]));
+        final Packet packet = constructor.newInstance(new Object[0]);
+        packet.read(in);
+
+        return packet;
     }
 
     /**
@@ -157,13 +162,19 @@ public abstract class PacketProtocol {
      * @throws IOException if there was an IO error whilst reading the packet.
      * @throws IllegalArgumentException If the packet ID is not registered.
      */
-    public Packet createServerboundPacket(int id, DataInputStream in) throws IOException {
+    public Packet createServerboundPacket(int id, DataInputStream in) throws IOException, InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         PacketDefinition<?> definition = this.serverbound.get(id);
         if (definition == null) {
             throw new IllegalArgumentException("Invalid packet id: " + id);
         }
 
-        return definition.getFactory().construct(in);
+        final Class<?> myClass = definition.getPacketClass();
+        final ReflectionFactory reflection = ReflectionFactory.getReflectionFactory();
+        final Constructor<Packet> constructor = (Constructor<Packet>) reflection.newConstructorForSerialization(myClass, Packet.class.getDeclaredConstructor(new Class[0]));
+        final Packet packet = constructor.newInstance(new Object[0]);
+        packet.read(in);
+
+        return packet;
     }
 
     /**

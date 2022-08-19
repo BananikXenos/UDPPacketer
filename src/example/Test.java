@@ -6,10 +6,10 @@ import java.net.UnknownHostException;
 
 public class Test {
     public static void main(String[] args) throws IOException, InterruptedException {
-        new UDPServerTest();
-
-        Thread.sleep(3000L);
-
         new UDPClientTest();
+
+        Thread.sleep(4000L);
+
+        new UDPServerTest();
     }
 }

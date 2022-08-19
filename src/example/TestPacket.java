@@ -6,24 +6,25 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-public class TestPacket implements Packet {
+public class TestPacket extends Packet {
     private String coolText;
     private long currentTime;
 
-    public TestPacket(String coolText, long currentTime){
+    public TestPacket(String coolText, long currentTime) {
         this.coolText = coolText;
         this.currentTime = currentTime;
-    }
-
-    public TestPacket(DataInputStream in) throws IOException {
-        this.coolText = in.readUTF();
-        this.currentTime = in.readLong();
     }
 
     @Override
     public void write(DataOutputStream out) throws IOException {
         out.writeUTF(this.coolText);
         out.writeLong(this.currentTime);
+    }
+
+    @Override
+    public void read(DataInputStream in) throws IOException {
+        this.coolText = in.readUTF();
+        this.currentTime = in.readLong();
     }
 
     public long getCurrentTime() {

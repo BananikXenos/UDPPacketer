@@ -13,7 +13,8 @@ public class UDPServerTest {
     private UDPServer server;
 
     public UDPServerTest() throws SocketException {
-        this.server = new UDPServer(new ExampleProtocol(), new ServerListener() {
+        this.server = new UDPServer(new ExampleProtocol());
+        this.server.addListener(new ServerListener() {
 
             @Override
             public void onClientConnected(Connection connection) {

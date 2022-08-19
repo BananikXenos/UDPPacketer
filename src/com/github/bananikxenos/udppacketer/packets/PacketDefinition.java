@@ -10,12 +10,10 @@ package com.github.bananikxenos.udppacketer.packets;
 public class PacketDefinition<T extends Packet> {
     private final int id;
     private final Class<T> packetClass;
-    private final PacketFactory<T> factory;
 
-    public PacketDefinition(final int id, final Class<T> packetClass, final PacketFactory<T> factory) {
+    public PacketDefinition(final int id, final Class<T> packetClass) {
         this.id = id;
         this.packetClass = packetClass;
-        this.factory = factory;
     }
 
     /**
@@ -34,14 +32,5 @@ public class PacketDefinition<T extends Packet> {
      */
     public Class<T> getPacketClass() {
         return this.packetClass;
-    }
-
-    /**
-     * Returns the {@link PacketFactory} of the packet.
-     *
-     * @return the packet factory of the packet
-     */
-    public PacketFactory<T> getFactory() {
-        return this.factory;
     }
 }

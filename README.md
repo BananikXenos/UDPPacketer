@@ -1,9 +1,11 @@
+# v3 Coming soon! No release dates.
+v2 is deprecated
 
 # UDPPacketer
 
 UDPPacketer is a networking library that uses UDP protocol and Packets with PacketProtocol.
 Packets use DataOutputStream & DataInputStream to use as least of network resources as possible,
-so its better than Serialization.
+so it's better than Serialization.
 
 
 ## Features
@@ -44,7 +46,7 @@ For usage see the [Wiki](https://github.com/BananikXenos/UDPPacketer/wiki)
 Contributions are always welcome!
 
 - My discord: Synse#3191
-- [Paypal](https://www.paypal.com/paypalme/scgxenos) Donate would be cool :)
+- [PayPal](https://www.paypal.com/paypalme/scgxenos) Donate would be cool :)
 
 
 ## License

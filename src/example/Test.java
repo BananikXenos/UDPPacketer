@@ -15,8 +15,15 @@ public class Test {
 
         client.send(new TestPacket(System.currentTimeMillis()));
 
-        Thread.sleep(3000L);
+        Client client2 = new ClientBuilder().withAddress("127.0.0.1").withPort(22566).withProtocol(new TestProtocol()).withListener(new ClientListener()).build();
+        client2.connect();
+
+        client2.send(new TestPacket(5000L));
+
+        Thread.sleep(5000);
 
         server.kick(server.getConnections().get(0));
+
+        server.close();
     }
 }

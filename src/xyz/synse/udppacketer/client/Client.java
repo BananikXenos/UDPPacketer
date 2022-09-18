@@ -16,7 +16,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.ArrayList;
-import java.util.Iterator;
 
 public class Client {
     private DatagramSocket datagramSocket;
@@ -24,7 +23,7 @@ public class Client {
     private final ArrayList<IListener> listeners = new ArrayList<>();
     private final PacketProtocol packetProtocol;
     private boolean connected = false;
-    private Object syncObject = new Object();
+    private final Object syncObject = new Object();
 
     public Client(InetAddress address, int port, PacketProtocol packetProtocol) {
         this.connection = new Connection(address, port);
@@ -88,6 +87,8 @@ public class Client {
                     }
 
                     if (packetType == Framework.RTT_REQUEST) {
+                        if(!connected)
+                            continue;
                         connection.getTimeOutTimer().reset();
                         sendRTTAnswer(inStream.readLong());
                         continue;
@@ -110,7 +111,7 @@ public class Client {
                          NoSuchMethodException e) {
                     throw new PacketerException("Error while receiving data", e);
                 }
-                catch (IOException ex){
+                catch (IOException ignored){
 
                 }
             }
@@ -124,6 +125,10 @@ public class Client {
                     for (IListener listener : listeners)
                         listener.disconnected(connection, "Timed out");
                     datagramSocket.close();
+                }
+
+                if (connection.getRttTimer().hasElapsed(Constants.RTT_TIMER, true) && connected) {
+                    sendRTTRequest(System.currentTimeMillis());
                 }
             }
         }).start();
@@ -185,6 +190,24 @@ public class Client {
             DataOutputStream dataOutStream = new DataOutputStream(outStream);
 
             dataOutStream.writeInt(Framework.RTT_ANSWER);
+            dataOutStream.writeLong(time);
+
+            byte[] bytes = outStream.toByteArray();
+
+            dataOutStream.close();
+
+            datagramSocket.send(new DatagramPacket(bytes, bytes.length, connection.getAddress(), connection.getPort()));
+        } catch (IOException e) {
+            throw new PacketerException("Failed to send packet", e);
+        }
+    }
+
+    private void sendRTTRequest(long time) {
+        try {
+            ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+            DataOutputStream dataOutStream = new DataOutputStream(outStream);
+
+            dataOutStream.writeInt(Framework.RTT_REQUEST);
             dataOutStream.writeLong(time);
 
             byte[] bytes = outStream.toByteArray();

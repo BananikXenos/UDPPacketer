@@ -8,6 +8,7 @@ public class Connection {
     private final InetAddress address;
     private final int port;
     private final Timer timeOutTimer = new Timer();
+    private final Timer rttTimer = new Timer();
     private double SmoothRTT = 400L;
 
     public Connection(InetAddress address, int port) {
@@ -25,6 +26,10 @@ public class Connection {
 
     public double getSmoothRTT() {
         return SmoothRTT;
+    }
+
+    public Timer getRttTimer() {
+        return rttTimer;
     }
 
     public void setSmoothRTT(double value){

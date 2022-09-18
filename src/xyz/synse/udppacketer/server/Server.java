@@ -106,6 +106,19 @@ public class Server {
                         continue;
                     }
 
+                    if (packetType == Framework.RTT_ANSWER) {
+                        Connection connection = getConnection(address, port);
+                        if (connection == null) {
+                            sendDisconnected(new Connection(address, port));
+                            System.out.println("Client is disconnected (address=" + address.toString() + ", port=" + port + ") but is sending RTT answer.");
+                            continue;
+                        }
+
+                        connection.getTimeOutTimer().reset();
+                        connection.setSmoothRTT(System.currentTimeMillis() - inStream.readLong());
+                        continue;
+                    }
+
                     if (packetType == Framework.PACKET) {
                         Connection connection = getConnection(address, port);
                         if (connection == null) {
@@ -123,7 +136,7 @@ public class Server {
                 } catch (InvocationTargetException | InstantiationException | IllegalAccessException |
                          NoSuchMethodException e) {
                     throw new PacketerException("Error while receiving data", e);
-                } catch (IOException ex){}
+                } catch (IOException ignored){}
             }
         }).start();
     }
@@ -138,6 +151,10 @@ public class Server {
                 while (i.hasNext()) {
                     try {
                         Connection con = i.next();
+
+                        if (con.getRttTimer().hasElapsed(Constants.RTT_TIMER, true)) {
+                            sendRTTRequest(System.currentTimeMillis(), con);
+                        }
                         if (con.getTimeOutTimer().hasElapsed(Constants.TIMEOUT, true)) {
                             sendDisconnected(con);
 
@@ -224,9 +241,27 @@ public class Server {
         }
     }
 
+    private void sendRTTRequest(long time, Connection connection) {
+        try {
+            ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+            DataOutputStream dataOutStream = new DataOutputStream(outStream);
+
+            dataOutStream.writeInt(Framework.RTT_REQUEST);
+            dataOutStream.writeLong(time);
+
+            byte[] bytes = outStream.toByteArray();
+
+            dataOutStream.close();
+
+            datagramSocket.send(new DatagramPacket(bytes, bytes.length, connection.getAddress(), connection.getPort()));
+        } catch (IOException e) {
+            throw new PacketerException("Failed to send packet", e);
+        }
+    }
+
     public void kick(Connection connection){
-        connections.remove(connection);
         sendDisconnected(connection);
+        connections.remove(connection);
 
         for (IListener listener : listeners)
             listener.disconnected(connection, "Kicked");

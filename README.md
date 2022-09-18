@@ -1,4 +1,4 @@
-# v3 Coming soon! No release dates.
+# v3 In progress. More fixes to be made
 v2 is deprecated
 
 # UDPPacketer

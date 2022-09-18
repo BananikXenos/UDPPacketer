@@ -16,7 +16,6 @@ so it's better than Serialization.
 - Multiple Listeners
 - Good Performance with Threads
 - Connection Management
-- Compression
 - Included [example](src/example/)
 
 
@@ -28,12 +27,12 @@ so it's better than Serialization.
 
 - Encryption
 
-- Kicking a connection
+- Compression
 
 
 ## Usage
 
-For usage see the [Wiki](https://github.com/BananikXenos/UDPPacketer/wiki)
+For usage see the [example](src/example/)
 
 
 ## Authors

@@ -1,4 +1,4 @@
-package com.github.bananikxenos.udppacketer.packets;
+package xyz.synse.udppacketer.common.packets;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

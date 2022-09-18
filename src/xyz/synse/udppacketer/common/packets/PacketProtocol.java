@@ -1,4 +1,4 @@
-package com.github.bananikxenos.udppacketer.packets;
+package xyz.synse.udppacketer.common.packets;
 
 import sun.reflect.ReflectionFactory;
 
